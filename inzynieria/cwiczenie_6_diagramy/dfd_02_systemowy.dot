@@ -1,0 +1,58 @@
+digraph G {
+  graph [
+    rankdir=LR,
+    splines=true,
+    nodesep=0.55,
+    ranksep=0.75,
+    bgcolor="white",
+    labelloc="t",
+    label="DFD - Diagram systemowy: główne funkcje",
+    fontname="Arial",
+    fontsize=20,
+    compound=true
+  ];
+  node [fontname="Arial", fontsize=11, margin="0.12,0.08"];
+  edge [fontname="Arial", fontsize=9, color="#3f3f3f", arrowsize=0.7];
+
+  node [shape=box, style="rounded,filled", fillcolor="#fff2cc", color="#b57f00", penwidth=1.3];
+  klient [label="Klient"];
+  pracownik [label="Pracownik obsługi"];
+  magazynier [label="Magazynier"];
+  kierownik [label="Kierownik sprzedaży"];
+  node [shape=ellipse, style="filled", fillcolor="#dae8fc", color="#2f5597", penwidth=1.4];
+  p1 [label="1.0\nObsługa zamówień"];
+  p2 [label="2.0\nObsługa klientów"];
+  p3 [label="3.0\nObsługa rejonów"];
+  p4 [label="4.0\nObsługa wyrobów"];
+  p5 [label="5.0\nObsługa magazynu"];
+  node [shape=cylinder, style="filled", fillcolor="#e2f0d9", color="#548235", penwidth=1.3];
+  d1 [label="D1\nZamówienia"];
+  d2 [label="D2\nKlienci"];
+  d3 [label="D3\nRejony"];
+  d4 [label="D4\nWyroby"];
+  d5 [label="D5\nStany magazynowe"];
+  klient -> p2 [label="dane rejestracyjne / aktualizacje"];
+  p2 -> d2 [label="dane klienta"];
+  d2 -> p2 [label="profil klienta"];
+  p2 -> p3 [label="adres i rejon klienta"];
+  klient -> p1 [label="zamówienie"];
+  p1 -> d1 [label="nagłówek i pozycje zamówienia"];
+  d1 -> p1 [label="historia i status zamówień"];
+  p1 -> p4 [label="pozycje zamówienia"];
+  p4 -> d4 [label="katalog wyrobów"];
+  d4 -> p4 [label="dane wyrobów"];
+  p1 -> p5 [label="zapotrzebowanie / rezerwacja"];
+  p5 -> d5 [label="rezerwacje i aktualne stany"];
+  d5 -> p5 [label="dostępność wyrobów"];
+  p5 -> p1 [label="potwierdzenie kompletacji"];
+  p1 -> klient [label="potwierdzenie i status"];
+  pracownik -> p1 [label="korekta zamówienia"];
+  pracownik -> p2 [label="obsługa klienta"];
+  kierownik -> p3 [label="definicje rejonów"];
+  p3 -> d3 [label="dane rejonu"];
+  d3 -> p3 [label="struktura rejonów"];
+  p3 -> p5 [label="magazyn obsługujący rejon"];
+  magazynier -> p5 [label="przyjęcia i wydania"];
+  p5 -> magazynier [label="lista kompletacji"];
+  p3 -> kierownik [label="raport rejonowy"];
+}

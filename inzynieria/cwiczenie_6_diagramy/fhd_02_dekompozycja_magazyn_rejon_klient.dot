@@ -1,0 +1,71 @@
+digraph G {
+  graph [
+    rankdir=TB,
+    splines=ortho,
+    nodesep=0.55,
+    ranksep=0.75,
+    bgcolor="white",
+    labelloc="t",
+    label="FHD - Dekompozycja funkcji: Klient, Rejon, Magazyn",
+    fontname="Arial",
+    fontsize=20
+  ];
+  node [
+    shape=box,
+    style="rounded,filled",
+    fillcolor="#f8fbff",
+    color="#3b6ea8",
+    penwidth=1.4,
+    fontname="Arial",
+    fontsize=12,
+    margin="0.14,0.08"
+  ];
+  edge [
+    color="#3b6ea8",
+    arrowsize=0.6,
+    arrowhead=none,
+    penwidth=1.2
+  ];
+
+  "root" [label="0. System obsługi zamówień"];
+  "f1" [label="1. Obsługa zamówień\n(...)"];
+  "f2" [label="2. Obsługa klientów"];
+  "f3" [label="3. Obsługa rejonów"];
+  "f4" [label="4. Obsługa wyrobów\n(...)"];
+  "f5" [label="5. Obsługa magazynu"];
+  "f21" [label="2.1 Rejestracja klienta"];
+  "f22" [label="2.2 Aktualizacja danych klienta"];
+  "f23" [label="2.3 Przypisanie klienta do rejonu"];
+  "f24" [label="2.4 Weryfikacja statusu klienta"];
+  "f25" [label="2.5 Udostępnienie historii zamówień"];
+  "f31" [label="3.1 Definiowanie rejonu"];
+  "f32" [label="3.2 Przypisanie klientów do rejonu"];
+  "f33" [label="3.3 Przypisanie magazynu obsługującego"];
+  "f34" [label="3.4 Analiza zapotrzebowania rejonu"];
+  "f35" [label="3.5 Raportowanie rejonowe"];
+  "f51" [label="5.1 Przyjęcie wyrobów"];
+  "f52" [label="5.2 Ewidencja stanów magazynowych"];
+  "f53" [label="5.3 Rezerwacja wyrobów pod zamówienie"];
+  "f54" [label="5.4 Kompletacja i wydanie zamówienia"];
+  "f55" [label="5.5 Uzupełnianie zapasów"];
+  "root" -> "f1";
+  "root" -> "f2";
+  "root" -> "f3";
+  "root" -> "f4";
+  "root" -> "f5";
+  "f2" -> "f21";
+  "f2" -> "f22";
+  "f2" -> "f23";
+  "f2" -> "f24";
+  "f2" -> "f25";
+  "f3" -> "f31";
+  "f3" -> "f32";
+  "f3" -> "f33";
+  "f3" -> "f34";
+  "f3" -> "f35";
+  "f5" -> "f51";
+  "f5" -> "f52";
+  "f5" -> "f53";
+  "f5" -> "f54";
+  "f5" -> "f55";
+}

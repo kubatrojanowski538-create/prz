@@ -1,0 +1,42 @@
+digraph G {
+  graph [
+    rankdir=LR,
+    splines=true,
+    nodesep=0.55,
+    ranksep=0.75,
+    bgcolor="white",
+    labelloc="t",
+    label="DFD szczegółowy - 2.0 Obsługa klientów",
+    fontname="Arial",
+    fontsize=20,
+    compound=true
+  ];
+  node [fontname="Arial", fontsize=11, margin="0.12,0.08"];
+  edge [fontname="Arial", fontsize=9, color="#3f3f3f", arrowsize=0.7];
+
+  node [shape=box, style="rounded,filled", fillcolor="#fff2cc", color="#b57f00", penwidth=1.3];
+  klient [label="Klient"];
+  pracownik [label="Pracownik obsługi"];
+  node [shape=ellipse, style="filled", fillcolor="#dae8fc", color="#2f5597", penwidth=1.4];
+  p21 [label="2.1\nPrzyjęcie danych klienta"];
+  p22 [label="2.2\nWeryfikacja danych"];
+  p23 [label="2.3\nPrzypisanie do rejonu"];
+  p24 [label="2.4\nZapis / aktualizacja klienta"];
+  p25 [label="2.5\nUdostępnienie danych do zamówień"];
+  node [shape=cylinder, style="filled", fillcolor="#e2f0d9", color="#548235", penwidth=1.3];
+  d2 [label="D2\nKlienci"];
+  d3 [label="D3\nRejony"];
+  d1 [label="D1\nZamówienia"];
+  klient -> p21 [label="formularz danych"];
+  pracownik -> p21 [label="dane z obsługi bezpośredniej"];
+  p21 -> p22 [label="dane klienta"];
+  p22 -> p23 [label="dane poprawne"];
+  p22 -> klient [label="prośba o korektę"];
+  d3 -> p23 [label="lista rejonów"];
+  p23 -> p24 [label="klient + rejon"];
+  p24 -> d2 [label="rekord klienta"];
+  d2 -> p25 [label="dane klienta"];
+  d1 -> p25 [label="historia zamówień"];
+  p25 -> pracownik [label="profil klienta"];
+  p25 -> klient [label="potwierdzenie danych"];
+}
