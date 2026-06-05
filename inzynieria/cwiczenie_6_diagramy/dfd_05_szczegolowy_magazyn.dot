@@ -1,0 +1,48 @@
+digraph G {
+  graph [
+    rankdir=LR,
+    splines=true,
+    nodesep=0.55,
+    ranksep=0.75,
+    bgcolor="white",
+    labelloc="t",
+    label="DFD szczegółowy - 5.0 Obsługa magazynu",
+    fontname="Arial",
+    fontsize=20,
+    compound=true
+  ];
+  node [fontname="Arial", fontsize=11, margin="0.12,0.08"];
+  edge [fontname="Arial", fontsize=9, color="#3f3f3f", arrowsize=0.7];
+
+  node [shape=box, style="rounded,filled", fillcolor="#fff2cc", color="#b57f00", penwidth=1.3];
+  magazynier [label="Magazynier"];
+  dostawca [label="Dostawca"];
+  pracownik [label="Pracownik obsługi"];
+  node [shape=ellipse, style="filled", fillcolor="#dae8fc", color="#2f5597", penwidth=1.4];
+  p51 [label="5.1\nPrzyjęcie wyrobów"];
+  p52 [label="5.2\nAktualizacja stanów"];
+  p53 [label="5.3\nRezerwacja pod zamówienie"];
+  p54 [label="5.4\nKompletacja i wydanie"];
+  p55 [label="5.5\nUzupełnianie zapasów"];
+  node [shape=cylinder, style="filled", fillcolor="#e2f0d9", color="#548235", penwidth=1.3];
+  d4 [label="D4\nWyroby"];
+  d5 [label="D5\nStany magazynowe"];
+  d1 [label="D1\nZamówienia"];
+  dostawca -> p51 [label="dostawa wyrobów"];
+  magazynier -> p51 [label="potwierdzenie przyjęcia"];
+  p51 -> d4 [label="dane wyrobu"];
+  p51 -> p52 [label="przyjęta ilość"];
+  p52 -> d5 [label="aktualny stan"];
+  d5 -> p52 [label="stan przed zmianą"];
+  pracownik -> p53 [label="dyspozycja rezerwacji"];
+  d1 -> p53 [label="pozycje zamówienia"];
+  d5 -> p53 [label="dostępność"];
+  p53 -> d5 [label="rezerwacja"];
+  p53 -> p54 [label="lista kompletacji"];
+  magazynier -> p54 [label="potwierdzenie wydania"];
+  p54 -> d5 [label="rozchód magazynowy"];
+  p54 -> d1 [label="status kompletacji"];
+  d5 -> p55 [label="poziomy minimalne i braki"];
+  p55 -> dostawca [label="zamówienie uzupełnienia"];
+  p55 -> pracownik [label="informacja o brakach"];
+}

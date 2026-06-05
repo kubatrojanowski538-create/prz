@@ -1,0 +1,45 @@
+digraph G {
+  graph [
+    rankdir=LR,
+    splines=true,
+    nodesep=0.55,
+    ranksep=0.75,
+    bgcolor="white",
+    labelloc="t",
+    label="DFD szczegółowy - 3.0 Obsługa rejonów",
+    fontname="Arial",
+    fontsize=20,
+    compound=true
+  ];
+  node [fontname="Arial", fontsize=11, margin="0.12,0.08"];
+  edge [fontname="Arial", fontsize=9, color="#3f3f3f", arrowsize=0.7];
+
+  node [shape=box, style="rounded,filled", fillcolor="#fff2cc", color="#b57f00", penwidth=1.3];
+  kierownik [label="Kierownik sprzedaży"];
+  pracownik [label="Pracownik obsługi"];
+  node [shape=ellipse, style="filled", fillcolor="#dae8fc", color="#2f5597", penwidth=1.4];
+  p31 [label="3.1\nDefiniowanie rejonu"];
+  p32 [label="3.2\nPrzypisanie klientów"];
+  p33 [label="3.3\nPrzypisanie magazynu"];
+  p34 [label="3.4\nAnaliza zapotrzebowania"];
+  p35 [label="3.5\nRaportowanie rejonowe"];
+  node [shape=cylinder, style="filled", fillcolor="#e2f0d9", color="#548235", penwidth=1.3];
+  d3 [label="D3\nRejony"];
+  d2 [label="D2\nKlienci"];
+  d1 [label="D1\nZamówienia"];
+  d5 [label="D5\nStany magazynowe"];
+  kierownik -> p31 [label="nazwa, zasięg, parametry rejonu"];
+  p31 -> d3 [label="dane rejonu"];
+  pracownik -> p32 [label="adres klienta / korekta rejonu"];
+  d2 -> p32 [label="klienci"];
+  d3 -> p32 [label="aktywny rejon"];
+  p32 -> d2 [label="przypisanie rejonu klienta"];
+  d3 -> p33 [label="rejon"];
+  d5 -> p33 [label="magazyny i dostępność"];
+  p33 -> d3 [label="magazyn obsługujący"];
+  d1 -> p34 [label="zamówienia z rejonu"];
+  d2 -> p34 [label="klienci z rejonu"];
+  p34 -> p35 [label="agregaty zapotrzebowania"];
+  d3 -> p35 [label="definicje rejonów"];
+  p35 -> kierownik [label="raport rejonowy"];
+}

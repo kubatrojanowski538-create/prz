@@ -1,0 +1,32 @@
+digraph G {
+  graph [
+    rankdir=LR,
+    splines=true,
+    nodesep=0.55,
+    ranksep=0.75,
+    bgcolor="white",
+    labelloc="t",
+    label="DFD - Diagram kontekstowy systemu obsługi zamówień",
+    fontname="Arial",
+    fontsize=20,
+    compound=true
+  ];
+  node [fontname="Arial", fontsize=11, margin="0.12,0.08"];
+  edge [fontname="Arial", fontsize=9, color="#3f3f3f", arrowsize=0.7];
+
+  node [shape=box, style="rounded,filled", fillcolor="#fff2cc", color="#b57f00", penwidth=1.3];
+  klient [label="Klient"];
+  pracownik [label="Pracownik obsługi"];
+  magazynier [label="Magazynier"];
+  kierownik [label="Kierownik sprzedaży"];
+  node [shape=ellipse, style="filled", fillcolor="#dae8fc", color="#2f5597", penwidth=1.4];
+  system [label="0\nSystem obsługi\nzamówień"];
+  klient -> system [label="dane klienta, zamówienie"];
+  system -> klient [label="potwierdzenie, status realizacji"];
+  pracownik -> system [label="dyspozycje obsługi, korekty danych"];
+  system -> pracownik [label="informacje o zamówieniach i klientach"];
+  magazynier -> system [label="stany, potwierdzenia wydań"];
+  system -> magazynier [label="dyspozycje rezerwacji i kompletacji"];
+  kierownik -> system [label="parametry rejonów, zapytania raportowe"];
+  system -> kierownik [label="raporty rejonów, sprzedaży i zapasów"];
+}
