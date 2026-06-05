@@ -176,16 +176,12 @@ prędkości do przedziału $[-5, 10]$ oraz zależność siły skrętu od prędko
 \begin{lstlisting}[style=cpp,caption={Aktualizacja prędkości i obrotu pojazdu (fragment \texttt{Car.cpp}).}]
 void Car::updateSpeedRot(Controls inputs) {
     this->speed *= 0.995f;                 // naturalne tlumienie
-    if (inputs.accelerate && (this->speed < 10))  this->speed += 0.1f;
-    if (inputs.brake      && (this->speed > -5))   this->speed -= 0.3f;
-    if (this->speed < -5) this->speed = -5;
-    if (this->speed > 10) this->speed = 10;
+    if (inputs.accelerate && this->speed < 10) this->speed += 0.1f;
+    if (inputs.brake      && this->speed > -5) this->speed -= 0.3f;
+    // ... ograniczenie predkosci do [-5, 10] ...
 
-    float maxTurn = 3.0f, turnSpeed = 0;
-    if (abs(this->speed) < 0.5f)        turnSpeed = 0;
-    else if (abs(this->speed) <= 5.0f)  turnSpeed = (this->speed/5.0f)*maxTurn;
-    else turnSpeed = maxTurn*(1.0f - 0.5f*((abs(this->speed)-5.0f)/5.0f));
-
+    // sila skretu (turnSpeed) zalezy od aktualnej predkosci
+    float turnSpeed = /* funkcja predkosci, maxTurn = 3.0f */;
     if (inputs.steerLeft)  this->rotation -= turnSpeed;
     if (inputs.steerRight) this->rotation += turnSpeed;
 }
@@ -216,12 +212,13 @@ względem aktualnego obrotu pojazdu:
 \noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}[style=cpp,caption={Wyznaczanie kierunków promieni (fragment \texttt{Car.cpp}).}]
 void Car::UpdateRays() {
+    // 13 promieni - przedni wachlarz (co 10 stopni)
     for (int i = 0; i < 13; i++)
         this->Rays[i] = { cos((-60 + 10*i + this->rotation)*DEG2RAD),
                           sin((-60 + 10*i + this->rotation)*DEG2RAD) };
+    // 7 promieni - tyl i boki (co 30 stopni)
     for (int i = 0; i < 7; i++)
-        this->Rays[i+13] = { cos((100 + 30*i + this->rotation)*DEG2RAD),
-                             sin((100 + 30*i + this->rotation)*DEG2RAD) };
+        this->Rays[i+13] = { /* analogicznie: 100 + 30*i + rotation */ };
 }
 \end{lstlisting}
 \end{minipage}
@@ -241,6 +238,10 @@ w \texttt{GameState.cpp} i ma postać:
 W ten sposób człowiek pełni rolę ,,nauczyciela'': model uczy się odwzorowywać
 decyzje gracza w zależności od sytuacji na torze (uczenie nadzorowane, ang.
 \emph{imitation learning}).
+
+Dane wykorzystane w projekcie zostały zebrane przez \textbf{jednego gracza} na
+\textbf{czterech różnych torach}. Łączny zarejestrowany materiał odpowiada około
+\textbf{10 minutom jazdy}.
 
 % =====================================================================
 \section{Sformułowanie problemu uczenia maszynowego}
@@ -275,38 +276,18 @@ kategoryczne, kodowane są binarnie bez skalowania.
 \subsection{Funkcja straty i nierównowaga klas}
 \label{sec:strata}
 
-\paragraph{Funkcja sigmoidalna.}
-Logit $z_k$ zwracany przez sieć dla $k$-tej akcji zamieniany jest na
-prawdopodobieństwo funkcją sigmoidalną (logistyczną):
-\begin{equation}
-\sigma(z) = \frac{1}{1 + e^{-z}} \in (0,1).
-\label{eq:sigmoid}
-\end{equation}
-Sigmoida ściska dowolną liczbę rzeczywistą do przedziału $(0,1)$, dzięki czemu
-$p_k = \sigma(z_k)$ można interpretować jako prawdopodobieństwo wciśnięcia danego
-klawisza. Każda z czterech akcji ma własną, niezależną sigmoidę --- to właśnie
-odróżnia klasyfikację wieloetykietową od jednoklasowej (gdzie stosuje się
-\emph{softmax} wymuszający sumę prawdopodobieństw równą~1).
-
-\paragraph{Binarna entropia krzyżowa.}
-Dla pojedynczej etykiety o wartości prawdziwej $y\in\{0,1\}$ i przewidzianym
-prawdopodobieństwie $p=\sigma(z)$ funkcją straty jest binarna entropia krzyżowa
-(ang. \emph{binary cross-entropy}, BCE):
+\paragraph{Sigmoida i entropia krzyżowa.}
+Każdy logit $z_k$ zamieniany jest na prawdopodobieństwo funkcją sigmoidalną
+$\sigma(z) = 1/(1 + e^{-z}) \in (0,1)$, osobną dla każdej z czterech akcji (co
+odróżnia klasyfikację wieloetykietową od jednoklasowej z funkcją \emph{softmax}).
+Funkcją straty dla pojedynczej etykiety $y\in\{0,1\}$ przy $p=\sigma(z)$ jest
+binarna entropia krzyżowa (BCE):
 \begin{equation}
 \ell(y, p) = -\big[\,y\,\log p + (1-y)\,\log(1-p)\,\big].
 \label{eq:bce}
 \end{equation}
-Strata jest mała, gdy $p$ jest bliskie wartości $y$, a rośnie tym szybciej, im
-pewniejsza jest błędna predykcja (silne karanie pewnych pomyłek).
-
-\paragraph{Wersja stabilna numerycznie.}
-Zastosowana funkcja \texttt{BCEWithLogitsLoss} łączy sigmoidę
-\eqref{eq:sigmoid} ze stratą \eqref{eq:bce} i liczy ją bezpośrednio z logitu $z$,
-co zapobiega niestabilności dla dużych $|z|$:
-\begin{equation}
-\ell(y, z) = \max(z, 0) - z\,y + \log\!\big(1 + e^{-|z|}\big).
-\label{eq:bcelogits}
-\end{equation}
+W praktyce stosujemy \texttt{BCEWithLogitsLoss}, które liczy stratę bezpośrednio
+z logitu $z$ (numerycznie stabilnie, bez osobnego nakładania sigmoidy w treningu).
 
 \paragraph{Ważenie klasy pozytywnej.}
 Ponieważ klawisze sterujące występują z bardzo różną częstością (hamowanie jest
@@ -381,18 +362,17 @@ nie są skalowane, lecz kodowane binarnie (one-hot).
 \begin{lstlisting}[style=py,caption={Budowa cech wejściowych: standaryzacja liczb i one-hot typów (fragment \texttt{train\_driver\_model.py}).}]
 def build_features(df, scaler=None, fit_scaler=False):
     numeric = df[NUMERIC_COLS].astype(np.float32).to_numpy()
-    if fit_scaler:
+    if fit_scaler:                       # scaler dopasowany tylko na zbiorze treningowym
         scaler = StandardScaler()
         numeric = scaler.fit_transform(numeric).astype(np.float32)
     else:
         numeric = scaler.transform(numeric).astype(np.float32)
 
-    type_features = []
+    type_features = []                   # one-hot typu promienia (kolejnosc: -1, 0, 1)
     for col in TYPE_COLS:
         values = df[col].astype(int).to_numpy()
-        for ray_type in RAY_TYPE_VALUES:           # kolejnosc: -1, 0, 1
-            one_hot = (values == ray_type).astype(np.float32).reshape(-1, 1)
-            type_features.append(one_hot)
+        for ray_type in RAY_TYPE_VALUES:
+            type_features.append((values == ray_type).astype(np.float32).reshape(-1, 1))
 
     x = np.concatenate([numeric] + type_features, axis=1).astype(np.float32)
     return x, scaler
@@ -456,21 +436,15 @@ w bibliotece PyTorch (klasa \texttt{DriverNet}). Sieć przyjmuje 81 cech i zwrac
 przeciwdziałającą przeuczeniu.
 
 \noindent\begin{minipage}{\linewidth}
-\begin{lstlisting}[style=py,caption={Architektura sieci \texttt{DriverNet} z konfigurowalnym dropoutem (fragment \texttt{grid\_search\_driver\_basic.py}).}]
+\begin{lstlisting}[style=py,caption={Architektura sieci \texttt{DriverNet} (fragment \texttt{grid\_search\_driver\_basic.py}). Liczba i rozmiary warstw ukrytych są strojonym hiperparametrem.}]
 class DriverNet(nn.Module):
     def __init__(self, input_size: int, dropout: float):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_size, 128),
-            nn.BatchNorm1d(128),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(128, 128),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 4),     # 4 logity: acc, brake, left, right
+            nn.BatchNorm1d(128), nn.ReLU(), nn.Dropout(dropout),
+            # ... kolejne warstwy ukryte (Linear + ReLU [+ Dropout]) ...
+            nn.Linear(64, 4),     # warstwa wyjsciowa: 4 logity (acc, brake, left, right)
         )
     def forward(self, x):
         return self.net(x)
@@ -513,16 +487,9 @@ je uczonymi parametrami $\gamma$ i $\beta$:
 gdzie $\mu_{\mathcal{B}}$, $\sigma_{\mathcal{B}}^2$ to średnia i wariancja cechy
 w paczce, a $\varepsilon$ to mała stała zapewniająca stabilność. Normalizacja
 stabilizuje rozkład aktywacji i pozwala na szybsze, stabilniejsze uczenie.
-
-\paragraph{Dropout.}
-Podczas treningu z prawdopodobieństwem $p$ zeruje wyjścia poszczególnych neuronów,
-a pozostałe skaluje przez $1/(1-p)$ (aby zachować wartość oczekiwaną):
-\begin{equation}
-\tilde{x}_j = \frac{m_j}{1-p}\,x_j,\qquad m_j \sim \mathrm{Bernoulli}(1-p).
-\label{eq:dropout}
-\end{equation}
-Wymusza to redundancję reprezentacji i ogranicza współzależność neuronów, co
-przeciwdziała przeuczeniu. W trybie wnioskowania dropout jest wyłączony.
+Dodatkowo, jako technikę regularyzacji, architektura może wykorzystywać warstwy
+\emph{dropout} losowo wyłączające część neuronów podczas treningu (siła dropoutu
+jest jednym ze strojonych hiperparametrów).
 
 % =====================================================================
 \section{Metodyka eksperymentów}
@@ -624,13 +591,11 @@ def action_predictions(y_prob, thresholds):
     pred = np.zeros_like(y_prob, dtype=np.int64)
     t_acc, t_brake, t_left, t_right = thresholds.tolist()
     brake_mask = y_prob[:, 1] >= t_brake
-    acc_mask   = (~brake_mask) & (y_prob[:, 0] >= t_acc)   # hamulec > gaz
+    acc_mask   = (~brake_mask) & (y_prob[:, 0] >= t_acc)   # hamulec ma priorytet nad gazem
     pred[brake_mask, 1] = 1
     pred[acc_mask, 0] = 1
-    left_active  = y_prob[:, 2] >= t_left
-    right_active = y_prob[:, 3] >= t_right
-    steer_active = left_active | right_active
-    pred[steer_active & (y_prob[:,2] >= y_prob[:,3]), 2] = 1   # lewo ALBO prawo
+    steer_active = (y_prob[:, 2] >= t_left) | (y_prob[:, 3] >= t_right)
+    pred[steer_active & (y_prob[:,2] >= y_prob[:,3]), 2] = 1   # skret: lewo ALBO prawo
     pred[steer_active & (y_prob[:,3] >  y_prob[:,2]), 3] = 1
     return pred
 \end{lstlisting}
@@ -661,10 +626,15 @@ parametry o największym wpływie na jakość kierowcy:
     \toprule
     \textbf{Hiperparametr} & \textbf{Testowane wartości} \\
     \midrule
+    Struktura sieci (\texttt{hidden\_layers}) & \texttt{64,64}; \texttt{128,64}; \\
+                                              & \texttt{128,128,64}; \texttt{256,128,64}; \\
+                                              & \texttt{256,256,128,64} \\
+    Aktywacja (\texttt{activation})           & \texttt{relu} \\
+    Normalizacja (\texttt{norm})              & \texttt{batch} \\
     Współczynnik uczenia (\texttt{lr})        & $10^{-3}$, $5\cdot10^{-4}$ \\
     Regularyzacja (\texttt{weight\_decay})    & $10^{-4}$, $10^{-3}$ \\
-    Dropout                                    & $0{,}05$, $0{,}10$, $0{,}20$ \\
-    Rozmiar wsadu (\texttt{batch\_size})      & $128$, $256$ \\
+    Dropout                                    & $0{,}0$, $0{,}05$, $0{,}10$, $0{,}20$ \\
+    Rozmiar wsadu (\texttt{batch\_size})      & $128$, $256$, $2048$ \\
     Limit wagi klasy (\texttt{pos\_weight\_cap}) & $5$, $10$, $20$ \\
     \bottomrule
   \end{tabular}
@@ -775,13 +745,49 @@ najlepszych modeli pojawia się pewien kompromis między tymi metrykami.
   \label{fig:scatter}
 \end{figure}
 
+\subsection{Wybór najlepszego modelu}
+\label{sec:najlepszy}
+
+Na podstawie rankingu według straty walidacyjnej (rysunek~\ref{fig:topval})
+jako najlepszą wybrano konfigurację \textbf{nr~7}. Wyróżnia się ona najniższą
+stratą walidacyjną oraz najwyższym macro-F1 (po dostrojeniu progów). Jej kluczowe
+hiperparametry oraz osiągnięte wyniki zestawiono w tabeli~\ref{tab:best}.
+
+\begin{table}[H]
+  \centering
+  \caption{Hiperparametry i wyniki najlepszej konfiguracji (model~nr~7).}
+  \label{tab:best}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Parametr / metryka} & \textbf{Wartość} \\
+    \midrule
+    Struktura sieci (\texttt{hidden\_layers}) & \texttt{256,256,128,64} \\
+    Aktywacja                                  & \texttt{relu} \\
+    Normalizacja                               & \texttt{batch} \\
+    Dropout                                    & $0{,}0$ \\
+    Współczynnik uczenia (\texttt{lr})         & $10^{-3}$ \\
+    Regularyzacja (\texttt{weight\_decay})     & $10^{-3}$ \\
+    Rozmiar wsadu (\texttt{batch\_size})       & $2048$ \\
+    Limit wagi klasy (\texttt{pos\_weight\_cap}) & $10$ \\
+    Progi decyzyjne (acc, brake, left, right)  & $[0{,}45,\ 0{,}65,\ 0{,}60,\ 0{,}60]$ \\
+    \midrule
+    Strata walidacyjna (\texttt{val\_loss})    & $0{,}0771$ \\
+    macro-F1 (progi runtime)                   & $0{,}7492$ \\
+    macro-F1 (progi dostrojone)                & $0{,}8117$ \\
+    F1 hamowania (progi dostrojone)            & $0{,}8031$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
 \subsection{Porównanie z modelem bazowym}
 
-Najlepsza konfiguracja wyłoniona w przeszukiwaniu osiąga niższą stratę walidacyjną
-i wyższe macro-F1 niż model bazowy, przy zachowaniu wysokiej skuteczności hamowania.
-Zysk wynika w dużej mierze z \textbf{łącznego} dostrojenia wag sieci oraz progów
-decyzyjnych, a nie z pojedynczego hiperparametru --- co potwierdza, że celem jest
-sprawny kierowca, a nie optymalizacja jednej liczby.
+Najlepsza konfiguracja osiąga niższą stratę walidacyjną ($0{,}0771$) i wyższe
+macro-F1 niż model bazowy, przy zachowaniu wysokiej skuteczności hamowania
+(F1 $\approx 0{,}80$). Warto zauważyć, że dostrojenie progów decyzyjnych podnosi
+macro-F1 z $0{,}7492$ (progi domyślne) do $0{,}8117$ --- to potwierdza, że
+\textbf{łączne} dostrojenie wag sieci oraz progów daje większy zysk niż optymalizacja
+pojedynczego hiperparametru, a celem jest sprawny kierowca, a nie minimalizacja
+jednej liczby.
 
 % =====================================================================
 \section{Wdrożenie modelu w grze}
@@ -799,19 +805,19 @@ przez klasę \texttt{NeuralDriver} (biblioteka ONNX Runtime). W każdej klatce g
 \end{enumerate}
 
 \noindent\begin{minipage}{\linewidth}
-\begin{lstlisting}[style=cpp,caption={Zamiana prawdopodobieństw na sterowanie w grze (fragment \texttt{NeuralDriver.cpp}).}]
+\begin{lstlisting}[style=cpp,caption={Zamiana prawdopodobieństw na sterowanie w grze (fragment \texttt{NeuralDriver.cpp}). Progi dostosowano do wartości z grid search.}]
 Controls NeuralDriver::PredictControls(const GameState& state) {
     std::vector<float> probs = PredictProbabilities(state);
     float pAccelerate = probs[0], pBrake = probs[1];
     float pSteerLeft = probs[2], pSteerRight = probs[3];
 
     Controls controls{};
-    if (pBrake > 0.50f)           controls.brake = 1.0f;        // priorytet hamulca
-    else if (pAccelerate > 0.30f) controls.accelerate = 1.0f;
+    if (pBrake > 0.65f)           controls.brake = 1.0f;        // priorytet hamulca
+    else if (pAccelerate > 0.45f) controls.accelerate = 1.0f;
 
-    float steeringThreshold = 0.35f;
+    float steeringThreshold = 0.60f;                            // left/right z grid search
     if (pSteerLeft > steeringThreshold || pSteerRight > steeringThreshold) {
-        if (pSteerLeft > pSteerRight) controls.steerLeft = 1.0f;  // lewo ALBO prawo
+        if (pSteerLeft > pSteerRight) controls.steerLeft = 1.0f;
         else                          controls.steerRight = 1.0f;
     }
     return controls;
@@ -819,9 +825,12 @@ Controls NeuralDriver::PredictControls(const GameState& state) {
 \end{lstlisting}
 \end{minipage}
 
-Przełączanie między kierowcą-człowiekiem a kierowcą-AI odbywa się w grze klawiszem
-\texttt{M}. Dzięki spójnemu budowaniu wejścia i identycznym progom decyzyjnym po
-obu stronach (Python i C++) zachowanie modelu w grze odpowiada wynikom z walidacji.
+Progi decyzyjne po stronie C++ zostały \textbf{dostosowane do wartości wyłonionych
+w grid search} dla najlepszego modelu (rozdział~\ref{sec:najlepszy}),
+tj.\ $[0{,}45,\ 0{,}65,\ 0{,}60,\ 0{,}60]$ odpowiednio dla gazu, hamulca oraz skrętu
+w lewo i prawo. Dzięki temu zachowanie modelu w grze odpowiada wynikom uzyskanym na
+zbiorze walidacyjnym. Przełączanie między kierowcą-człowiekiem a kierowcą-AI odbywa
+się w grze klawiszem \texttt{M}.
 
 % =====================================================================
 \section{Analiza błędów i ograniczenia}
