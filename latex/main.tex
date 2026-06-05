@@ -60,6 +60,9 @@
 \lstdefinestyle{py}{language=Python}
 \lstdefinestyle{cpp}{language=C++}
 
+% Pozwala TeX-owi nieco rozciągnąć wiersze, ograniczając "overfull hbox".
+\emergencystretch=3em
+
 \begin{document}
 
 % =====================================================================
@@ -109,6 +112,50 @@ Projekt obejmuje pełny proces uczenia maszynowego:
 \end{enumerate}
 
 % =====================================================================
+\section{Wykorzystany model uczenia maszynowego}
+\label{sec:model-overview}
+
+W projekcie kierowcę-komputer realizuje \textbf{sztuczna sieć neuronowa typu
+wielowarstwowy perceptron} (ang. \emph{multilayer perceptron}, MLP; sieć
+jednokierunkowa, \emph{feedforward}). Jest to model uczenia nadzorowanego, który
+odwzorowuje wektor cech opisujący sytuację na torze na wektor decyzji sterujących.
+
+\subsection{Idea modelu}
+
+Sieć złożona jest z kolejnych \emph{warstw gęstych} (w pełni połączonych). Każdy
+neuron warstwy oblicza ważoną sumę swoich wejść powiększoną o wyraz wolny (\emph{bias}),
+a wynik przepuszcza przez nieliniową funkcję aktywacji. Dla $l$-tej warstwy:
+\begin{equation}
+\mathbf{h}^{(l)} = \phi\!\left(\mathbf{W}^{(l)}\mathbf{h}^{(l-1)} + \mathbf{b}^{(l)}\right),
+\qquad \mathbf{h}^{(0)} = \mathbf{x},
+\label{eq:forward}
+\end{equation}
+gdzie $\mathbf{x}\in\mathbb{R}^{81}$ to wektor cech wejściowych (rozdział~\ref{sec:problem}),
+$\mathbf{W}^{(l)}$ i $\mathbf{b}^{(l)}$ to wagi i biasy uczone podczas treningu, a
+$\phi$ to funkcja aktywacji (w naszym przypadku ReLU). Warstwa wyjściowa jest
+\emph{liniowa} (bez aktywacji) i zwraca cztery \emph{logity}
+$\mathbf{z}=(z_\text{acc}, z_\text{brake}, z_\text{left}, z_\text{right})\in\mathbb{R}^4$,
+zamieniane na prawdopodobieństwa funkcją sigmoidalną (rozdział~\ref{sec:strata}).
+Uczenie polega na takim doborze wag $\mathbf{W}^{(l)}, \mathbf{b}^{(l)}$ (metodą
+spadku gradientu i propagacji wstecznej), aby minimalizować funkcję straty.
+
+\subsection{Uzasadnienie wyboru}
+
+MLP dobrze pasuje do tego zadania, ponieważ:
+\begin{itemize}[noitemsep]
+  \item wejście ma \textbf{stałą długość} (81 cech) i postać tabelaryczną, bez
+        struktury przestrzennej czy sekwencyjnej, która uzasadniałaby sieci
+        splotowe (CNN) lub rekurencyjne (RNN);
+  \item wnioskowanie jest \textbf{bardzo szybkie}, co jest kluczowe przy
+        sterowaniu w czasie rzeczywistym (predykcja w każdej klatce gry);
+  \item model ma wystarczającą pojemność, by uchwycić nieliniowe zależności między
+        odczytami czujników a decyzjami kierowcy.
+\end{itemize}
+Szczegółową architekturę konkretnej sieci (\texttt{DriverNet}) opisano w
+rozdziale~\ref{sec:model}, a teorię użytych w niej mechanizmów --- w
+rozdziale~\ref{sec:teoria-warstw}.
+
+% =====================================================================
 \section{Opis środowiska --- gra w C++}
 \label{sec:srodowisko}
 
@@ -125,6 +172,7 @@ odbywa się czterema niezależnymi sygnałami (\emph{Controls}): \texttt{acceler
 (z pliku \texttt{Car.cpp}) zakłada m.in. naturalne tłumienie prędkości, ograniczenie
 prędkości do przedziału $[-5, 10]$ oraz zależność siły skrętu od prędkości:
 
+\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}[style=cpp,caption={Aktualizacja prędkości i obrotu pojazdu (fragment \texttt{Car.cpp}).}]
 void Car::updateSpeedRot(Controls inputs) {
     this->speed *= 0.995f;                 // naturalne tlumienie
@@ -142,6 +190,7 @@ void Car::updateSpeedRot(Controls inputs) {
     if (inputs.steerRight) this->rotation += turnSpeed;
 }
 \end{lstlisting}
+\end{minipage}
 
 Kolizja z barierą (typ~0) powoduje reset pojazdu do punktu odrodzenia, blok
 checkpoint (typ~2) aktualizuje punkt odrodzenia, a wjazd na metę (typ~3) zatrzymuje
@@ -164,6 +213,7 @@ Te 20 odległości oraz 20 typów wraz z prędkością tworzą pełny \emph{stan
 (\texttt{GameState}), który stanowi wejście modelu. Zestaw promieni jest aktualizowany
 względem aktualnego obrotu pojazdu:
 
+\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}[style=cpp,caption={Wyznaczanie kierunków promieni (fragment \texttt{Car.cpp}).}]
 void Car::UpdateRays() {
     for (int i = 0; i < 13; i++)
@@ -174,6 +224,7 @@ void Car::UpdateRays() {
                              sin((100 + 30*i + this->rotation)*DEG2RAD) };
 }
 \end{lstlisting}
+\end{minipage}
 
 \subsection{Zbieranie danych}
 
@@ -222,17 +273,67 @@ Cechy numeryczne (\texttt{car\_speed} oraz odległości) są standaryzowane
 kategoryczne, kodowane są binarnie bez skalowania.
 
 \subsection{Funkcja straty i nierównowaga klas}
+\label{sec:strata}
 
-Jako funkcję straty zastosowano \texttt{BCEWithLogitsLoss} (binarna entropia
-krzyżowa liczona bezpośrednio z logitów). Ponieważ klawisze sterujące występują
-w danych z bardzo różną częstością (np. hamowanie jest rzadkie, a przyspieszanie
-niemal stałe), do każdej etykiety przypisano wagę pozytywnej klasy $w_k$
-(\texttt{pos\_weight}):
-\[
+\paragraph{Funkcja sigmoidalna.}
+Logit $z_k$ zwracany przez sieć dla $k$-tej akcji zamieniany jest na
+prawdopodobieństwo funkcją sigmoidalną (logistyczną):
+\begin{equation}
+\sigma(z) = \frac{1}{1 + e^{-z}} \in (0,1).
+\label{eq:sigmoid}
+\end{equation}
+Sigmoida ściska dowolną liczbę rzeczywistą do przedziału $(0,1)$, dzięki czemu
+$p_k = \sigma(z_k)$ można interpretować jako prawdopodobieństwo wciśnięcia danego
+klawisza. Każda z czterech akcji ma własną, niezależną sigmoidę --- to właśnie
+odróżnia klasyfikację wieloetykietową od jednoklasowej (gdzie stosuje się
+\emph{softmax} wymuszający sumę prawdopodobieństw równą~1).
+
+\paragraph{Binarna entropia krzyżowa.}
+Dla pojedynczej etykiety o wartości prawdziwej $y\in\{0,1\}$ i przewidzianym
+prawdopodobieństwie $p=\sigma(z)$ funkcją straty jest binarna entropia krzyżowa
+(ang. \emph{binary cross-entropy}, BCE):
+\begin{equation}
+\ell(y, p) = -\big[\,y\,\log p + (1-y)\,\log(1-p)\,\big].
+\label{eq:bce}
+\end{equation}
+Strata jest mała, gdy $p$ jest bliskie wartości $y$, a rośnie tym szybciej, im
+pewniejsza jest błędna predykcja (silne karanie pewnych pomyłek).
+
+\paragraph{Wersja stabilna numerycznie.}
+Zastosowana funkcja \texttt{BCEWithLogitsLoss} łączy sigmoidę
+\eqref{eq:sigmoid} ze stratą \eqref{eq:bce} i liczy ją bezpośrednio z logitu $z$,
+co zapobiega niestabilności dla dużych $|z|$:
+\begin{equation}
+\ell(y, z) = \max(z, 0) - z\,y + \log\!\big(1 + e^{-|z|}\big).
+\label{eq:bcelogits}
+\end{equation}
+
+\paragraph{Ważenie klasy pozytywnej.}
+Ponieważ klawisze sterujące występują z bardzo różną częstością (hamowanie jest
+rzadkie, a przyspieszanie niemal stałe), do każdej etykiety przypisano wagę klasy
+pozytywnej $w_k$ (\texttt{pos\_weight}), która wzmacnia wkład rzadkich, lecz
+istotnych przykładów pozytywnych:
+\begin{equation}
+\ell_{w}(y, z) = -\big[\,w\,y\,\log\sigma(z) + (1-y)\,\log(1-\sigma(z))\,\big].
+\label{eq:wbce}
+\end{equation}
+Wagę dobiera się na podstawie proporcji liczby przykładów negatywnych do
+pozytywnych, z ograniczeniem do przedziału $[0{,}5, c]$:
+\begin{equation}
 w_k = \mathrm{clip}\!\left(\frac{N_\text{neg}^{(k)}}{\max(N_\text{pos}^{(k)},\,1)},\ 0{,}5,\ c\right),
-\]
-gdzie $c$ to górne ograniczenie wagi (hiperparametr \texttt{pos\_weight\_cap}).
-Mechanizm ten zapobiega ignorowaniu rzadkich, ale istotnych akcji (np. hamowania).
+\label{eq:posweight}
+\end{equation}
+gdzie $c$ to górne ograniczenie (hiperparametr \texttt{pos\_weight\_cap}).
+Mechanizm ten zapobiega ignorowaniu rzadkich akcji (np. hamowania).
+
+\paragraph{Strata całkowita.}
+Ostateczna strata minimalizowana podczas treningu to średnia
+\eqref{eq:wbce} po wszystkich $K=4$ etykietach i $N$ przykładach w paczce:
+\begin{equation}
+\mathcal{L} = \frac{1}{N\,K}\sum_{i=1}^{N}\sum_{k=1}^{K}
+\ell_{w_k}\!\big(y_{ik}, z_{ik}\big).
+\label{eq:total-loss}
+\end{equation}
 
 % =====================================================================
 \section{Dane i ich przygotowanie}
@@ -262,6 +363,21 @@ Skrypt przygotowujący dane (zaimplementowany w funkcjach \texttt{load\_data} or
         $\mathbf{y}$ o 4 kolumnach.
 \end{enumerate}
 
+\paragraph{Standaryzacja cech (z-score).}
+Cechy numeryczne mają różne zakresy (prędkość rzędu jednostek, odległości promieni
+rzędu setek), co utrudnia uczenie sieci. Standaryzacja sprowadza każdą cechę do
+średniej~$0$ i odchylenia standardowego~$1$:
+\begin{equation}
+x' = \frac{x - \mu}{\sigma},
+\label{eq:standaryzacja}
+\end{equation}
+gdzie $\mu$ i $\sigma$ to średnia i odchylenie standardowe danej cechy. Co istotne,
+parametry te wyznacza się \textbf{wyłącznie na zbiorze treningowym}, a następnie tymi
+samymi wartościami przekształca zbiór walidacyjny --- zapobiega to wyciekowi
+informacji ze zbioru testowego do procesu uczenia. Cechy kategoryczne (typ promienia)
+nie są skalowane, lecz kodowane binarnie (one-hot).
+
+\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}[style=py,caption={Budowa cech wejściowych: standaryzacja liczb i one-hot typów (fragment \texttt{train\_driver\_model.py}).}]
 def build_features(df, scaler=None, fit_scaler=False):
     numeric = df[NUMERIC_COLS].astype(np.float32).to_numpy()
@@ -281,6 +397,7 @@ def build_features(df, scaler=None, fit_scaler=False):
     x = np.concatenate([numeric] + type_features, axis=1).astype(np.float32)
     return x, scaler
 \end{lstlisting}
+\end{minipage}
 
 \subsection{Spójność uczenia i wdrożenia}
 
@@ -289,12 +406,14 @@ standaryzacji (średnia i odchylenie) są eksportowane do nagłówka C++
 (\texttt{AIScalerData.h}). Dzięki temu funkcja \texttt{BuildAIInputFromGameState}
 buduje wektor wejściowy w dokładnie tej samej kolejności i skali co skrypt uczący:
 
+\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}[style=cpp,caption={Standaryzacja cech po stronie gry (fragment \texttt{AIInputBuilder.cpp}).}]
 static float ScaleNumericInput(float value, int index) {
     return (value - AI_INPUT_MEAN[index]) / AI_INPUT_SCALE[index];
 }
 // 1x car_speed + 20x ray_dist + 20x one-hot(ray_type) => 81 cech
 \end{lstlisting}
+\end{minipage}
 
 % =====================================================================
 \section{Analiza eksploracyjna danych}
@@ -336,6 +455,7 @@ w bibliotece PyTorch (klasa \texttt{DriverNet}). Sieć przyjmuje 81 cech i zwrac
 (\emph{batch normalization}), funkcje aktywacji ReLU oraz warstwę dropout
 przeciwdziałającą przeuczeniu.
 
+\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}[style=py,caption={Architektura sieci \texttt{DriverNet} z konfigurowalnym dropoutem (fragment \texttt{grid\_search\_driver\_basic.py}).}]
 class DriverNet(nn.Module):
     def __init__(self, input_size: int, dropout: float):
@@ -355,10 +475,54 @@ class DriverNet(nn.Module):
     def forward(self, x):
         return self.net(x)
 \end{lstlisting}
+\end{minipage}
 
 Sieć zwraca logity (bez sigmoidy), ponieważ funkcja straty
-\texttt{BCEWithLogitsLoss} łączy w sobie sigmoidę i entropię krzyżową w sposób
-numerycznie stabilny. Sigmoida nakładana jest dopiero na etapie wnioskowania.
+\texttt{BCE\allowbreak WithLogitsLoss} łączy w sobie sigmoidę i entropię krzyżową
+w sposób numerycznie stabilny. Sigmoida nakładana jest dopiero na etapie wnioskowania.
+
+\subsection{Teoria użytych mechanizmów}
+\label{sec:teoria-warstw}
+
+Architektura \texttt{DriverNet} składa się z kilku typów warstw, których działanie
+opisano poniżej.
+
+\paragraph{Warstwa liniowa (\texttt{nn.Linear}).}
+Realizuje przekształcenie afiniczne $\mathbf{y} = \mathbf{W}\mathbf{x} + \mathbf{b}$
+(por.\ wzór~\eqref{eq:forward}). Macierz wag $\mathbf{W}$ i wektor biasów
+$\mathbf{b}$ to parametry uczone. Same warstwy liniowe potrafią modelować tylko
+zależności liniowe, dlatego przeplata się je nieliniowymi aktywacjami.
+
+\paragraph{Aktywacja ReLU.}
+Funkcja \emph{rectified linear unit} wprowadza nieliniowość:
+\begin{equation}
+\mathrm{ReLU}(x) = \max(0, x).
+\label{eq:relu}
+\end{equation}
+Jest tania obliczeniowo, a jej gradient (równy $0$ dla $x<0$ i $1$ dla $x>0$)
+nie zanika dla dużych wartości dodatnich, co przyspiesza uczenie głębokich sieci.
+
+\paragraph{Normalizacja wsadowa (\texttt{BatchNorm1d}).}
+Dla każdej cechy normalizuje aktywacje w obrębie paczki danych, a następnie skaluje
+je uczonymi parametrami $\gamma$ i $\beta$:
+\begin{equation}
+\hat{x} = \frac{x - \mu_{\mathcal{B}}}{\sqrt{\sigma_{\mathcal{B}}^2 + \varepsilon}},
+\qquad y = \gamma\,\hat{x} + \beta,
+\label{eq:batchnorm}
+\end{equation}
+gdzie $\mu_{\mathcal{B}}$, $\sigma_{\mathcal{B}}^2$ to średnia i wariancja cechy
+w paczce, a $\varepsilon$ to mała stała zapewniająca stabilność. Normalizacja
+stabilizuje rozkład aktywacji i pozwala na szybsze, stabilniejsze uczenie.
+
+\paragraph{Dropout.}
+Podczas treningu z prawdopodobieństwem $p$ zeruje wyjścia poszczególnych neuronów,
+a pozostałe skaluje przez $1/(1-p)$ (aby zachować wartość oczekiwaną):
+\begin{equation}
+\tilde{x}_j = \frac{m_j}{1-p}\,x_j,\qquad m_j \sim \mathrm{Bernoulli}(1-p).
+\label{eq:dropout}
+\end{equation}
+Wymusza to redundancję reprezentacji i ogranicza współzależność neuronów, co
+przeciwdziała przeuczeniu. W trybie wnioskowania dropout jest wyłączony.
 
 % =====================================================================
 \section{Metodyka eksperymentów}
@@ -375,23 +539,75 @@ uczciwszą ocenę. Powtarzalność zapewnia ustalone ziarno losowości
 
 \subsection{Procedura treningu}
 
-Trening wykorzystuje optymalizator \texttt{AdamW} (z regularyzacją \emph{weight
-decay}) oraz mechanizm \textbf{wczesnego zatrzymania} (\emph{early stopping}):
-zapamiętywany jest stan modelu o najmniejszej stracie walidacyjnej, a uczenie
+Trening wykorzystuje optymalizator \texttt{AdamW} oraz mechanizm \textbf{wczesnego
+zatrzymania} (\emph{early stopping}).
+
+\paragraph{Optymalizator AdamW.}
+Wagi aktualizowane są metodą gradientową z adaptacyjnym krokiem (Adam) i
+\emph{odsprzężoną} regularyzacją wag (\emph{weight decay}). Dla gradientu
+$\mathbf{g}_t$ utrzymywane są wykładnicze średnie pierwszego i drugiego momentu:
+\begin{align}
+\mathbf{m}_t &= \beta_1 \mathbf{m}_{t-1} + (1-\beta_1)\,\mathbf{g}_t, &
+\hat{\mathbf{m}}_t &= \frac{\mathbf{m}_t}{1-\beta_1^{\,t}}, \\
+\mathbf{v}_t &= \beta_2 \mathbf{v}_{t-1} + (1-\beta_2)\,\mathbf{g}_t^{2}, &
+\hat{\mathbf{v}}_t &= \frac{\mathbf{v}_t}{1-\beta_2^{\,t}},
+\end{align}
+a aktualizacja parametrów ma postać:
+\begin{equation}
+\boldsymbol{\theta}_t = \boldsymbol{\theta}_{t-1}
+- \eta\left(\frac{\hat{\mathbf{m}}_t}{\sqrt{\hat{\mathbf{v}}_t}+\varepsilon}
++ \lambda\,\boldsymbol{\theta}_{t-1}\right),
+\label{eq:adamw}
+\end{equation}
+gdzie $\eta$ to współczynnik uczenia, $\lambda$ to siła regularyzacji
+(\texttt{weight\_decay}), a $\beta_1, \beta_2$ to współczynniki wygładzania momentów.
+Składnik $\lambda\,\boldsymbol{\theta}_{t-1}$ ,,ściąga'' wagi w stronę zera,
+ograniczając przeuczenie. W odróżnieniu od klasycznego Adama z regularyzacją L2,
+AdamW odsprzęga ten składnik od adaptacyjnego skalowania, co poprawia generalizację.
+
+\paragraph{Wczesne zatrzymanie.}
+Zapamiętywany jest stan modelu o najmniejszej stracie walidacyjnej, a uczenie
 przerywane jest, gdy strata nie poprawia się przez ustaloną liczbę epok
-(\texttt{patience}).
+(\texttt{patience}). Chroni to przed przeuczeniem i skraca czas treningu.
 
 \subsection{Metryki oceny}
 
-Ze względu na nierównowagę klas oraz wieloetykietowy charakter problemu raportowane są:
-\begin{itemize}[noitemsep]
-  \item \textbf{strata walidacyjna} (\texttt{val\_loss}),
-  \item \textbf{dokładność dokładna} (\emph{exact accuracy}) --- odsetek klatek,
-        w których wszystkie 4 akcje przewidziano poprawnie,
-  \item \textbf{dokładność per-przycisk} dla każdej akcji,
-  \item \textbf{precyzja, czułość, F1} dla każdej akcji oraz uśrednione (macro-F1),
-  \item \textbf{PR-AUC} (pole pod krzywą precyzja--czułość) dla rzadkich klas.
-\end{itemize}
+Ze względu na nierównowagę klas oraz wieloetykietowy charakter problemu raportowane
+są poniższe metryki. Oznaczmy przez TP, FP, FN, TN odpowiednio liczbę trafień
+prawdziwie/fałszywie dodatnich i fałszywie/prawdziwie ujemnych.
+
+\paragraph{Precyzja, czułość i F1.}
+Precyzja mówi, jaka część przewidzianych ,,wciśnięć'' była trafna, a czułość
+(\emph{recall}) --- jaką część rzeczywistych wciśnięć udało się wykryć:
+\begin{equation}
+\mathrm{Precyzja} = \frac{TP}{TP+FP},\qquad
+\mathrm{Czu\l{}o\'s\'c} = \frac{TP}{TP+FN}.
+\label{eq:prec-rec}
+\end{equation}
+Miara F1 to ich średnia harmoniczna, równoważąca oba aspekty --- szczególnie
+przydatna przy nierównowadze klas:
+\begin{equation}
+F_1 = \frac{2\cdot\mathrm{Precyzja}\cdot\mathrm{Czu\l{}o\'s\'c}}
+{\mathrm{Precyzja}+\mathrm{Czu\l{}o\'s\'c}}.
+\label{eq:f1}
+\end{equation}
+\emph{Macro-F1} to średnia $F_1$ po wszystkich $K=4$ akcjach (każda akcja waży tak
+samo, niezależnie od częstości): $\mathrm{macro\text{-}}F_1 = \frac{1}{K}\sum_{k} F_1^{(k)}$.
+
+\paragraph{Dokładność dokładna.}
+Najsurowsza metryka --- odsetek klatek, w których \emph{wszystkie} cztery akcje
+przewidziano poprawnie jednocześnie:
+\begin{equation}
+\mathrm{ExactAcc} = \frac{1}{N}\sum_{i=1}^{N}
+\mathbb{1}\!\left[\hat{\mathbf{y}}_i = \mathbf{y}_i\right].
+\label{eq:exactacc}
+\end{equation}
+
+\paragraph{Pozostałe metryki.}
+Dodatkowo raportowane są: \textbf{strata walidacyjna} (\texttt{val\_loss}),
+\textbf{dokładność per-przycisk} (dla każdej akcji osobno) oraz \textbf{PR-AUC}
+(pole pod krzywą precyzja--czułość, ang.\ \emph{average precision}), będące dobrą
+miarą jakości dla bardzo rzadkich klas, takich jak hamowanie.
 
 \subsection{Logika decyzyjna i progi}
 \label{sec:progi}
@@ -402,6 +618,7 @@ zasad gry: \textbf{hamowanie ma priorytet nad gazem}, a skręt to wybór
 elementem rozwiązania --- są strojone na zbiorze walidacyjnym pod kątem F1, co
 często poprawia jakość sterowania bardziej niż dalsze dostrajanie wag sieci.
 
+\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}[style=py,caption={Zamiana prawdopodobieństw na sterowanie z priorytetem hamowania (fragment \texttt{grid\_search\_driver\_basic.py}).}]
 def action_predictions(y_prob, thresholds):
     pred = np.zeros_like(y_prob, dtype=np.int64)
@@ -417,6 +634,7 @@ def action_predictions(y_prob, thresholds):
     pred[steer_active & (y_prob[:,3] >  y_prob[:,2]), 3] = 1
     return pred
 \end{lstlisting}
+\end{minipage}
 
 % =====================================================================
 \section{Model bazowy i strojenie konfiguracji}
@@ -424,16 +642,16 @@ def action_predictions(y_prob, thresholds):
 
 \subsection{Model bazowy}
 
-Punktem odniesienia jest model wytrenowany w skrypcie \texttt{train\_driver\_model.py}
-z ustalonymi parametrami (m.in. \texttt{lr}=$0{,}001$, \texttt{weight\_decay}=$10^{-4}$,
+Punktem odniesienia jest model wytrenowany w skrypcie
+\texttt{train\_driver\_\allowbreak model.py} z ustalonymi parametrami (m.in. \texttt{lr}=$0{,}001$, \texttt{weight\_decay}=$10^{-4}$,
 \texttt{batch\_size}=$512$, dropout $0{,}1$, \texttt{pos\_weight\_cap}=$20$, do 80 epok).
 Stanowi on bazę, względem której oceniamy zyski z optymalizacji.
 
 \subsection{Przeszukiwanie przestrzeni hiperparametrów}
 
 Globalną optymalizację zrealizowano metodą \emph{grid search}
-(\texttt{grid\_search\_driver\_basic.py}). Przeszukiwana siatka obejmuje parametry
-o największym wpływie na jakość kierowcy:
+(\texttt{grid\_search\_\allowbreak driver\_basic.py}). Przeszukiwana siatka obejmuje
+parametry o największym wpływie na jakość kierowcy:
 
 \begin{table}[H]
   \centering
@@ -573,13 +791,14 @@ Wytrenowany model eksportowany jest do formatu \textbf{ONNX} i ładowany w grze
 przez klasę \texttt{NeuralDriver} (biblioteka ONNX Runtime). W każdej klatce gra:
 \begin{enumerate}[noitemsep]
   \item buduje 81-elementowy wektor wejściowy ze stanu pojazdu
-        (\texttt{BuildAIInputFromGameState}),
+        (\texttt{BuildAIInput\allowbreak From\allowbreak GameState}),
   \item uruchamia model i otrzymuje 4 logity,
   \item nakłada sigmoidę, uzyskując prawdopodobieństwa,
   \item stosuje progi i zasady decyzyjne (priorytet hamowania, wybór jednego
         kierunku skrętu), zamieniając prawdopodobieństwa na sterowanie.
 \end{enumerate}
 
+\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}[style=cpp,caption={Zamiana prawdopodobieństw na sterowanie w grze (fragment \texttt{NeuralDriver.cpp}).}]
 Controls NeuralDriver::PredictControls(const GameState& state) {
     std::vector<float> probs = PredictProbabilities(state);
@@ -598,6 +817,7 @@ Controls NeuralDriver::PredictControls(const GameState& state) {
     return controls;
 }
 \end{lstlisting}
+\end{minipage}
 
 Przełączanie między kierowcą-człowiekiem a kierowcą-AI odbywa się w grze klawiszem
 \texttt{M}. Dzięki spójnemu budowaniu wejścia i identycznym progom decyzyjnym po
