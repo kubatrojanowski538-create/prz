@@ -1,6 +1,6 @@
 digraph G {
   graph [
-    rankdir=LR,
+    rankdir=TB,
     splines=true,
     nodesep=0.55,
     ranksep=0.75,
@@ -22,11 +22,11 @@ digraph G {
   node [shape=ellipse, style="filled", fillcolor="#dae8fc", color="#2f5597", penwidth=1.4];
   system [label="0\nSystem obsługi\nzamówień"];
   klient -> system [label="dane klienta, zamówienie"];
-  system -> klient [label="potwierdzenie, status realizacji"];
-  pracownik -> system [label="dyspozycje obsługi, korekty danych"];
-  system -> pracownik [label="informacje o zamówieniach i klientach"];
-  magazynier -> system [label="stany, potwierdzenia wydań"];
-  system -> magazynier [label="dyspozycje rezerwacji i kompletacji"];
-  kierownik -> system [label="parametry rejonów, zapytania raportowe"];
-  system -> kierownik [label="raporty rejonów, sprzedaży i zapasów"];
+  system -> klient [label="potwierdzenie, status\nrealizacji"];
+  pracownik -> system [label="dyspozycje obsługi,\nkorekty danych"];
+  system -> pracownik [label="informacje o\nzamówieniach i klientach"];
+  magazynier -> system [label="stany, potwierdzenia\nwydań"];
+  system -> magazynier [label="dyspozycje rezerwacji i\nkompletacji"];
+  kierownik -> system [label="parametry rejonów,\nzapytania raportowe"];
+  system -> kierownik [label="raporty rejonów,\nsprzedaży i zapasów"];
 }

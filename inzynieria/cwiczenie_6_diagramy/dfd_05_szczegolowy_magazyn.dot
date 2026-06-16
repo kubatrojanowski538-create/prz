@@ -1,6 +1,6 @@
 digraph G {
   graph [
-    rankdir=LR,
+    rankdir=TB,
     splines=true,
     nodesep=0.55,
     ranksep=0.75,
@@ -21,7 +21,7 @@ digraph G {
   node [shape=ellipse, style="filled", fillcolor="#dae8fc", color="#2f5597", penwidth=1.4];
   p51 [label="5.1\nPrzyjęcie wyrobów"];
   p52 [label="5.2\nAktualizacja stanów"];
-  p53 [label="5.3\nRezerwacja pod zamówienie"];
+  p53 [label="5.3\nRezerwacja pod\nzamówienie"];
   p54 [label="5.4\nKompletacja i wydanie"];
   p55 [label="5.5\nUzupełnianie zapasów"];
   node [shape=cylinder, style="filled", fillcolor="#e2f0d9", color="#548235", penwidth=1.3];
@@ -42,7 +42,7 @@ digraph G {
   magazynier -> p54 [label="potwierdzenie wydania"];
   p54 -> d5 [label="rozchód magazynowy"];
   p54 -> d1 [label="status kompletacji"];
-  d5 -> p55 [label="poziomy minimalne i braki"];
+  d5 -> p55 [label="poziomy minimalne i\nbraki"];
   p55 -> dostawca [label="zamówienie uzupełnienia"];
   p55 -> pracownik [label="informacja o brakach"];
 }

@@ -1,6 +1,6 @@
 digraph G {
   graph [
-    rankdir=LR,
+    rankdir=TB,
     splines=true,
     nodesep=0.55,
     ranksep=0.75,
@@ -31,27 +31,27 @@ digraph G {
   d3 [label="D3\nRejony"];
   d4 [label="D4\nWyroby"];
   d5 [label="D5\nStany magazynowe"];
-  klient -> p2 [label="dane rejestracyjne / aktualizacje"];
+  klient -> p2 [label="dane rejestracyjne /\naktualizacje"];
   p2 -> d2 [label="dane klienta"];
   d2 -> p2 [label="profil klienta"];
   p2 -> p3 [label="adres i rejon klienta"];
   klient -> p1 [label="zamówienie"];
-  p1 -> d1 [label="nagłówek i pozycje zamówienia"];
-  d1 -> p1 [label="historia i status zamówień"];
+  p1 -> d1 [label="nagłówek i pozycje\nzamówienia"];
+  d1 -> p1 [label="historia i status\nzamówień"];
   p1 -> p4 [label="pozycje zamówienia"];
   p4 -> d4 [label="katalog wyrobów"];
   d4 -> p4 [label="dane wyrobów"];
-  p1 -> p5 [label="zapotrzebowanie / rezerwacja"];
-  p5 -> d5 [label="rezerwacje i aktualne stany"];
+  p1 -> p5 [label="zapotrzebowanie /\nrezerwacja"];
+  p5 -> d5 [label="rezerwacje i aktualne\nstany"];
   d5 -> p5 [label="dostępność wyrobów"];
-  p5 -> p1 [label="potwierdzenie kompletacji"];
+  p5 -> p1 [label="potwierdzenie\nkompletacji"];
   p1 -> klient [label="potwierdzenie i status"];
   pracownik -> p1 [label="korekta zamówienia"];
   pracownik -> p2 [label="obsługa klienta"];
   kierownik -> p3 [label="definicje rejonów"];
   p3 -> d3 [label="dane rejonu"];
   d3 -> p3 [label="struktura rejonów"];
-  p3 -> p5 [label="magazyn obsługujący rejon"];
+  p3 -> p5 [label="magazyn obsługujący\nrejon"];
   magazynier -> p5 [label="przyjęcia i wydania"];
   p5 -> magazynier [label="lista kompletacji"];
   p3 -> kierownik [label="raport rejonowy"];

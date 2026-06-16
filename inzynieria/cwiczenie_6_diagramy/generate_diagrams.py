@@ -11,10 +11,21 @@ store and external actor.
 from __future__ import annotations
 
 import subprocess
+import textwrap
 from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent
+
+
+def wrap_label(label: str, width: int = 24) -> str:
+    """Wrap DOT labels without touching intentional line breaks."""
+    return "\\n".join(
+        "\\n".join(textwrap.wrap(part, width=width, break_long_words=False))
+        if part
+        else part
+        for part in label.split("\\n")
+    )
 
 
 def render(name: str, dot: str) -> None:
@@ -31,7 +42,7 @@ def render(name: str, dot: str) -> None:
 
 def fhd_diagram(name: str, title: str, edges: list[tuple[str, str]], labels: dict[str, str]) -> None:
     nodes = "\n".join(
-        f'  "{node}" [label="{label}"];' for node, label in labels.items()
+        f'  "{node}" [label="{wrap_label(label, 26)}"];' for node, label in labels.items()
     )
     edge_lines = "\n".join(f'  "{src}" -> "{dst}";' for src, dst in edges)
     render(
@@ -39,7 +50,7 @@ def fhd_diagram(name: str, title: str, edges: list[tuple[str, str]], labels: dic
         f"""
 digraph G {{
   graph [
-    rankdir=TB,
+    rankdir=LR,
     splines=ortho,
     nodesep=0.55,
     ranksep=0.75,
@@ -73,7 +84,57 @@ digraph G {{
     )
 
 
-def dfd_common_header(title: str, rankdir: str = "LR") -> str:
+def fhd_decomposition_compact() -> None:
+    render(
+        "fhd_02_dekompozycja_magazyn_rejon_klient",
+        """
+digraph G {
+  graph [
+    rankdir=LR,
+    splines=ortho,
+    nodesep=0.45,
+    ranksep=0.65,
+    bgcolor="white",
+    labelloc="t",
+    label="FHD - Dekompozycja funkcji: Klient, Rejon, Magazyn",
+    fontname="Arial",
+    fontsize=20
+  ];
+  node [
+    shape=box,
+    style="rounded,filled",
+    fillcolor="#f8fbff",
+    color="#3b6ea8",
+    penwidth=1.4,
+    fontname="Arial",
+    fontsize=11,
+    margin="0.14,0.08"
+  ];
+  edge [
+    color="#3b6ea8",
+    arrowsize=0.6,
+    arrowhead=none,
+    penwidth=1.2
+  ];
+
+  root [label="0. System obsługi zamówień"];
+  f1 [label="1. Obsługa zamówień\\n(...)"];
+  f2 [label="2. Obsługa klientów\\n\\n2.1 Rejestracja klienta\\n2.2 Aktualizacja danych klienta\\n2.3 Przypisanie klienta do rejonu\\n2.4 Weryfikacja statusu klienta\\n2.5 Udostępnienie historii zamówień"];
+  f3 [label="3. Obsługa rejonów\\n\\n3.1 Definiowanie rejonu\\n3.2 Przypisanie klientów do rejonu\\n3.3 Przypisanie magazynu obsługującego\\n3.4 Analiza zapotrzebowania rejonu\\n3.5 Raportowanie rejonowe"];
+  f4 [label="4. Obsługa wyrobów\\n(...)"];
+  f5 [label="5. Obsługa magazynu\\n\\n5.1 Przyjęcie wyrobów\\n5.2 Ewidencja stanów magazynowych\\n5.3 Rezerwacja wyrobów pod zamówienie\\n5.4 Kompletacja i wydanie zamówienia\\n5.5 Uzupełnianie zapasów"];
+
+  root -> f1;
+  root -> f2;
+  root -> f3;
+  root -> f4;
+  root -> f5;
+}
+""",
+    )
+
+
+def dfd_common_header(title: str, rankdir: str = "TB") -> str:
     return f"""
 digraph G {{
   graph [
@@ -96,23 +157,23 @@ digraph G {{
 
 
 def actor(node: str, label: str) -> str:
-    return f'  {node} [label="{label}"];\n'
+    return f'  {node} [label="{wrap_label(label, 22)}"];\n'
 
 
 def process_block(items: list[tuple[str, str]]) -> str:
     lines = ['  node [shape=ellipse, style="filled", fillcolor="#dae8fc", color="#2f5597", penwidth=1.4];']
-    lines += [f'  {node} [label="{label}"];' for node, label in items]
+    lines += [f'  {node} [label="{wrap_label(label, 22)}"];' for node, label in items]
     return "\n".join(lines) + "\n"
 
 
 def store_block(items: list[tuple[str, str]]) -> str:
     lines = ['  node [shape=cylinder, style="filled", fillcolor="#e2f0d9", color="#548235", penwidth=1.3];']
-    lines += [f'  {node} [label="{label}"];' for node, label in items]
+    lines += [f'  {node} [label="{wrap_label(label, 22)}"];' for node, label in items]
     return "\n".join(lines) + "\n"
 
 
 def flow(src: str, dst: str, label: str) -> str:
-    return f'  {src} -> {dst} [label="{label}"];\n'
+    return f'  {src} -> {dst} [label="{wrap_label(label, 24)}"];\n'
 
 
 def build_diagrams() -> None:
@@ -136,55 +197,7 @@ def build_diagrams() -> None:
         },
     )
 
-    fhd_diagram(
-        "fhd_02_dekompozycja_magazyn_rejon_klient",
-        "FHD - Dekompozycja funkcji: Klient, Rejon, Magazyn",
-        [
-            ("root", "f1"),
-            ("root", "f2"),
-            ("root", "f3"),
-            ("root", "f4"),
-            ("root", "f5"),
-            ("f2", "f21"),
-            ("f2", "f22"),
-            ("f2", "f23"),
-            ("f2", "f24"),
-            ("f2", "f25"),
-            ("f3", "f31"),
-            ("f3", "f32"),
-            ("f3", "f33"),
-            ("f3", "f34"),
-            ("f3", "f35"),
-            ("f5", "f51"),
-            ("f5", "f52"),
-            ("f5", "f53"),
-            ("f5", "f54"),
-            ("f5", "f55"),
-        ],
-        {
-            "root": "0. System obsługi zamówień",
-            "f1": "1. Obsługa zamówień\\n(...)",
-            "f2": "2. Obsługa klientów",
-            "f3": "3. Obsługa rejonów",
-            "f4": "4. Obsługa wyrobów\\n(...)",
-            "f5": "5. Obsługa magazynu",
-            "f21": "2.1 Rejestracja klienta",
-            "f22": "2.2 Aktualizacja danych klienta",
-            "f23": "2.3 Przypisanie klienta do rejonu",
-            "f24": "2.4 Weryfikacja statusu klienta",
-            "f25": "2.5 Udostępnienie historii zamówień",
-            "f31": "3.1 Definiowanie rejonu",
-            "f32": "3.2 Przypisanie klientów do rejonu",
-            "f33": "3.3 Przypisanie magazynu obsługującego",
-            "f34": "3.4 Analiza zapotrzebowania rejonu",
-            "f35": "3.5 Raportowanie rejonowe",
-            "f51": "5.1 Przyjęcie wyrobów",
-            "f52": "5.2 Ewidencja stanów magazynowych",
-            "f53": "5.3 Rezerwacja wyrobów pod zamówienie",
-            "f54": "5.4 Kompletacja i wydanie zamówienia",
-            "f55": "5.5 Uzupełnianie zapasów",
-        },
-    )
+    fhd_decomposition_compact()
 
     context = dfd_common_header("DFD - Diagram kontekstowy systemu obsługi zamówień")
     context += actor("klient", "Klient")

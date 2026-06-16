@@ -11,5 +11,8 @@ Wygenerowane diagramy dla systemu obsługi zamówień na podstawie instrukcji z 
 - `dfd_03_szczegolowy_klient.svg/png` - DFD szczegółowy procesu Obsługa klientów.
 - `dfd_04_szczegolowy_rejon.svg/png` - DFD szczegółowy procesu Obsługa rejonów.
 - `dfd_05_szczegolowy_magazyn.svg/png` - DFD szczegółowy procesu Obsługa magazynu.
+- `sprawozdanie_cwiczenie_6.docx` - skromne sprawozdanie z poleceniami i głównymi diagramami.
 
 Każdy diagram ma też edytowalne źródło `.dot`.
+
+Diagramy można odtworzyć poleceniem `python3 generate_diagrams.py`, a dokument DOCX poleceniem `python3 generate_report.py`.
