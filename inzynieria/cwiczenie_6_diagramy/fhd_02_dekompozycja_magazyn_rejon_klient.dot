@@ -1,0 +1,42 @@
+digraph G {
+  graph [
+    rankdir=LR,
+    splines=ortho,
+    nodesep=0.45,
+    ranksep=0.65,
+    bgcolor="white",
+    labelloc="t",
+    label="FHD - Dekompozycja funkcji: Klient, Rejon, Magazyn",
+    fontname="Arial",
+    fontsize=20
+  ];
+  node [
+    shape=box,
+    style="rounded,filled",
+    fillcolor="#f8fbff",
+    color="#3b6ea8",
+    penwidth=1.4,
+    fontname="Arial",
+    fontsize=11,
+    margin="0.14,0.08"
+  ];
+  edge [
+    color="#3b6ea8",
+    arrowsize=0.6,
+    arrowhead=none,
+    penwidth=1.2
+  ];
+
+  root [label="0. System obsługi zamówień"];
+  f1 [label="1. Obsługa zamówień\n(...)"];
+  f2 [label="2. Obsługa klientów\n\n2.1 Rejestracja klienta\n2.2 Aktualizacja danych klienta\n2.3 Przypisanie klienta do rejonu\n2.4 Weryfikacja statusu klienta\n2.5 Udostępnienie historii zamówień"];
+  f3 [label="3. Obsługa rejonów\n\n3.1 Definiowanie rejonu\n3.2 Przypisanie klientów do rejonu\n3.3 Przypisanie magazynu obsługującego\n3.4 Analiza zapotrzebowania rejonu\n3.5 Raportowanie rejonowe"];
+  f4 [label="4. Obsługa wyrobów\n(...)"];
+  f5 [label="5. Obsługa magazynu\n\n5.1 Przyjęcie wyrobów\n5.2 Ewidencja stanów magazynowych\n5.3 Rezerwacja wyrobów pod zamówienie\n5.4 Kompletacja i wydanie zamówienia\n5.5 Uzupełnianie zapasów"];
+
+  root -> f1;
+  root -> f2;
+  root -> f3;
+  root -> f4;
+  root -> f5;
+}
